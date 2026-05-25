@@ -49,7 +49,7 @@ print(result.content)  # JSON rows
 tools["hotdata_create_managed_database"].call(
     name="sales",
     schema_name="public",
-    tables="orders,customers",
+    tables="orders\ncustomers",
 )
 
 tools["hotdata_load_managed_table"].call(
