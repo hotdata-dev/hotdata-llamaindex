@@ -1,11 +1,6 @@
 # hotdata-llamaindex
 
-LlamaIndex tools for [Hotdata](https://hotdata.dev), built on **hotdata-runtime**.
-
-## Features
-
-- **SQL tool** — run workspace SQL and return JSON rows for agents
-- **Managed database tools** — list, create, and load parquet into Hotdata-owned catalogs (replaces legacy dataset uploads)
+Give your [LlamaIndex](https://www.llamaindex.ai/) agents access to [Hotdata](https://hotdata.dev) — run SQL against your workspace connections and work with managed databases.
 
 ## Install
 
@@ -13,29 +8,48 @@ LlamaIndex tools for [Hotdata](https://hotdata.dev), built on **hotdata-runtime*
 pip install hotdata-llamaindex
 ```
 
-Requires `HOTDATA_API_KEY`. Optionally set `HOTDATA_WORKSPACE`, `HOTDATA_API_URL`, or `HOTDATA_SANDBOX`.
+## Authentication
 
-## Usage
+Set `HOTDATA_API_KEY` in your environment. Optionally set `HOTDATA_WORKSPACE` to pin a specific workspace (the first available workspace is used if unset).
+
+## Quickstart
 
 ```python
+from llama_index.core.agent.workflow import FunctionAgent
 import hotdata_llamaindex as hli
 
 client = hli.from_env()
 tools = hli.make_hotdata_tools(client)
 
-for tool in tools:
-    print(tool.metadata.name, tool.metadata.description)
+agent = FunctionAgent(tools=tools, llm=your_llm)
+response = await agent.run("How many rows are in the orders table?")
 ```
 
-Managed database example:
+## Tools
+
+`make_hotdata_tools(client)` returns a list of LlamaIndex `FunctionTool` objects ready to pass to any agent:
+
+| Tool | What it does |
+|------|-------------|
+| `hotdata_execute_sql` | Run a SQL query and return rows as JSON |
+| `hotdata_list_managed_databases` | List available managed databases |
+| `hotdata_create_managed_database` | Create a new managed database |
+| `hotdata_load_managed_table` | Load a parquet file into a managed table |
+
+## Calling tools directly
+
+You can also call tools outside of an agent loop:
 
 ```python
-tools = {tool.metadata.name: tool for tool in hli.make_hotdata_tools(client)}
+tools = {t.metadata.name: t for t in hli.make_hotdata_tools(client)}
+
+result = tools["hotdata_execute_sql"].call(sql="SELECT * FROM orders LIMIT 10")
+print(result.content)  # JSON rows
 
 tools["hotdata_create_managed_database"].call(
     name="sales",
     schema_name="public",
-    tables="orders",
+    tables="orders,customers",
 )
 
 tools["hotdata_load_managed_table"].call(
@@ -45,7 +59,23 @@ tools["hotdata_load_managed_table"].call(
 )
 ```
 
-## Examples
+## Scoping queries to a managed database
+
+Pass `database=` so all SQL the agent runs resolves against a specific managed database:
+
+```python
+tools = hli.make_hotdata_tools(client, database="sales")
+```
+
+## Controlling result size
+
+Limit how many rows are returned to the LLM. Useful for keeping responses within context limits (default: 100):
+
+```python
+tools = hli.make_hotdata_tools(client, max_rows=50)
+```
+
+## Run the examples
 
 ```bash
 uv run python examples/llamaindex_basic.py
